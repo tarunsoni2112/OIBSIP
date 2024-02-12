@@ -1,0 +1,69 @@
+import speech_recognition as sr
+from nltk.corpus import wordnet
+import PyDictionary
+import gtts
+
+def recognize_speech_from_mic(recognizer, microphone):
+    """Transcribe speech from recorded from `microphone`.
+
+    Returns a dictionary with three keys:
+    "success": a boolean indicating whether or not the API request was successful
+    "error":   `None` if no error occurred, otherwise a string containing a description of the error
+    "transcription": `None` if speech was not transcribed, otherwise a string containing the transcribed text
+    """
+    # check that recognizer and microphone arguments are appropriate type
+    if not isinstance(recognizer, sr.Recognizer):
+        raise TypeError("`recognizer` must be `Recognizer` instance")
+
+    if not isinstance(microphone, sr.Microphone):
+        raise TypeError("`microphone` must be `Microphone` instance")
+
+    # adjust the recognizer sensitivity to ambient noise and record audio
+    with microphone as source:
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source)
+
+    # set up the response object
+    response = {
+        "success": True,
+        "error": None,
+        "transcription": None
+    }
+
+    try:
+        response["transcription"] = recognizer.recognize_google(audio)
+    except sr.RequestError:
+        # API requests are limited per day, the error message will be updated later.
+        response["success"] = False
+        response["error"] = "API unavailable"
+    except sr.UnknownValueError:
+        response["error"] = "Unable to recognize speech"
+
+    return response
+
+def process_speech(transcription):
+    dictionary = PyDictionary()
+    words = transcription.split()
+    for word in words:
+        synonyms = dictionary.synonym(word)
+        if synonyms:
+            print(f"Synonyms for {word}: {', '.join(synonyms)}")
+        else:
+            print(f"No synonyms found for {word}")
+
+def main():
+    recognizer = sr.Recognizer()
+    microphone = sr.Microphone()
+
+    with microphone as source:
+        print("Say something!")
+        response = recognize_speech_from_mic(recognizer, microphone)
+
+    if response["success"]:
+        print("You said: ", response["transcription"])
+        process_speech(response["transcription"])
+    else:
+        print("Error: ", response["error"])
+
+if __name__ == "__main__":
+    main()
